@@ -2,6 +2,6 @@ compare cd > 0
 conditional results false "defint cd 6"
 add cd -1
 compare cd > 0
-wait 10001:13 AM 11/10/2018
+wait 1000
 conditional results true "print %cd%" "run example.txt"
 print "TA-DA!"
