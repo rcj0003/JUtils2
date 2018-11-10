@@ -11,7 +11,7 @@ class Compatibility():
     """Provides simple methods to aid with compatibility."""
     def getVersion():
         """Returns a tuple providing the major, minor, patch, and pre-release identifier like so: (Major, Minor, Patch, Identifier)"""
-        return (0, 3, 0, "")
+        return (0, 4, 0, "")
 
     def getVersionString():
         """Returns the version in the following format: Major.Minor.Patch(-Pre-release Indetifier)\nThe identifier may be absent if the release is a full release."""
@@ -94,6 +94,10 @@ class Utilities():
             if values.get(x, None) != None:
                 string = string.replace(f"%{x}%", str(values[x]))
         return string
+
+    def convertStringToHash(string):
+        """Returns a SHA256 hash from a string."""
+        return sha.sha256(string.encode(encoding="UTF-16")).hexdigest()
     
     def logTracebackToFile(filename):
         """Logs the most recent traceback to a file named 'filename'."""
