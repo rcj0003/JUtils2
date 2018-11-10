@@ -11,7 +11,7 @@ class Compatibility():
     """Provides simple methods to aid with compatibility."""
     def getVersion():
         """Returns a tuple providing the major, minor, patch, and pre-release identifier like so: (Major, Minor, Patch, Identifier)"""
-        return (0, 2, 1, "")
+        return (0, 3, 0, "")
 
     def getVersionString():
         """Returns the version in the following format: Major.Minor.Patch(-Pre-release Indetifier)\nThe identifier may be absent if the release is a full release."""
@@ -87,6 +87,13 @@ class Utilities():
             return int(value)
         except:
             return otherwise
+
+    def replaceAll(string, values):
+        """Parses string to replace all values (%value%) with their corresponding dictionary value."""
+        for x in values.keys():
+            if values.get(x, None) != None:
+                string = string.replace(f"%{x}%", str(values[x]))
+        return string
     
     def logTracebackToFile(filename):
         """Logs the most recent traceback to a file named 'filename'."""
@@ -164,14 +171,24 @@ class CommandProcessor2():
         """Input a list of commands, either parsed or non-parsed, to be queue and executed later."""
         self.queue += AdvancedMap(commands).selectivelyMapResults(lambda x: type(x) is str, lambda x: Utilities.parseCommand(x)).getResults()
 
-    def executeQueue(self):
+    def forceQueueCommands(self, commands):
+        """Does the same thing as queueCommands, but forces the inputted commands to the front of the queue."""
+        self.queue = AdvancedMap(commands).selectivelyMapResults(lambda x: type(x) is str, lambda x: Utilities.parseCommand(x)).getResults() + self.queue
+
+    def executeNextInQueue(self):
         """Execute stored commands."""
-        queue = self.queue.copy()
-        self.queue.clear()
-        self.executeCommands(queue)
+        if not self.isQueueClear():
+            command = self.queue.pop(0)
+            self.executeCommand(command[0], command[1])
+        return not(len(self.queue) == 0)
 
     def isQueueClear(self):
+        """Returns true if the command queue is clear."""
         return len(self.queue) == 0
+
+    def clearCommandQueue(self):
+        """Clears command queue."""
+        self.queue.clear()
 
     def executeCommands(self, commands):
         """Input a list of commands, either parsed or non-parsed, to be executed."""
@@ -179,6 +196,8 @@ class CommandProcessor2():
 
     def executeCommand(self, command, args = []):
         """Input a command and its arguments to execute the command."""
+        global storedVariables
+        args = AdvancedMap(args).mapResults(lambda x: Utilities.replaceAll(x, storedVariables)).getResults()
         try:
             if type(command) is str:
                 command = self.commands[command]
@@ -270,8 +289,7 @@ class DefineCommand():
 
     def execute(self, args):
         global storedVariables
-        default = "" if len(args) == 1 and (args[0] not in storedVariables.keys()) else storedVariables[args[0]]
-        storedVariables.update({args[0]: default if len(args) < 2 else args[1]})
+        storedVariables.update({args[0]: "" if len(args) == 1 and not(args[0] in storedVariables) else args[1]})
 
     def getMinimumArguments(self):
         return 1
@@ -294,8 +312,7 @@ class DefineIntCommand():
 
     def execute(self, args):
         global storedVariables
-        default = 0 if len(args) == 1 and (args[0] not in storedVariables.keys()) else storedVariables[args[0]]
-        storedVariables.update({args[0]: default if len(args) < 2 else Utilities.tryParse(args[1], args[1])})
+        storedVariables.update({args[0]: 0 if len(args) == 1 and not(args[0] in storedVariables) else Utilities.tryParse(args[1], -1)})
 
     def getMinimumArguments(self):
         return 1
@@ -320,7 +337,7 @@ class AddCommand():
         global storedVariables
         try:
             if type(storedVariables[args[0]]) is int:
-                storedVariables[args[0]] += Utilities.tryParse(args[1], args[1])
+                storedVariables[args[0]] += Utilities.tryParse(args[1], 0)
             else:
                 storedVariables[args[0]] += args[1]
         except:
@@ -351,12 +368,7 @@ class ConditionalCommand():
     def execute(self, args):
         global storedVariables
         if str(storedVariables[args[0]]) == args[1]:
-            self.processor.queueCommands(AdvancedMap(args[2:]).mapResults(lambda x: ConditionalCommand.__replaceAll(x, storedVariables)).getResults())
-
-    def __replaceAll(string, data):
-        for x in data.keys():
-            string = string.replace(f"%{x}%", str(data[x]))
-        return string
+            self.processor.forceQueueCommands(args[2:])
 
     def getMinimumArguments(self):
         return 3
@@ -424,45 +436,7 @@ class PrintCommand():
         return "print"
 
     def execute(self, args):
-        global storedVariables
-        message = PrintCommand.__replaceAll(args[0], storedVariables)
-        print(message)
-
-    def __replaceAll(string, data):
-        for x in data.keys():
-            string = string.replace(f"%{x}%", str(data[x]))
-        return string
-
-    def getMinimumArguments(self):
-        return 1
-    
-    def getUsage(self):
-        return "print [message]"
-    
-    def getShortDescription(self):
-        return "Prints a message on screen."
-    
-    def getLongDescription(self):
-        return ["Prints a message on screen.", "Use %VariableName% to insert stored variable values."]
-
-    def isEnabled(self):
-        return True
-
-class ExecuteCommand():
-    def __init__(self, processor):
-        self.processor = processor
-    
-    def getName(self):
-        return "execute"
-
-    def execute(self, args):
-        global storedVariables
-        self.processor.queueCommands(AdvancedMap(args).mapResults(lambda x: ExecuteCommand.__replaceAll(x, storedVariables)).getResults())
-
-    def __replaceAll(string, data):
-        for x in data.keys():
-            string = string.replace(f"%{x}%", str(data[x]))
-        return string
+        AdvancedMap(args).forEach(lambda x: print(x))
 
     def getMinimumArguments(self):
         return 1
@@ -492,16 +466,12 @@ class RunScriptCommand():
             with open(args[0], "r") as fileRead:
                 commands = AdvancedMap(fileRead).mapResults(lambda x: x.strip()).filterResults(lambda x: len(x) > 0).getResults()
             global storedVariables
-            self.processor.queueCommands(AdvancedMap(commands).mapResults(lambda x: RunScriptCommand.__replaceAll(x, storedVariables)).getResults())
+            self.processor.clearCommandQueue()
+            self.processor.forceQueueCommands(commands)
         except IOError:
             print("The script does not exist!")
         except:
             print("An error occurred while trying to run the script.")
-
-    def __replaceAll(string, data):
-        for x in data.keys():
-            string = string.replace(f"%{x}%", str(data[x]))
-        return string
 
     def getMinimumArguments(self):
         return 1
@@ -543,6 +513,30 @@ class WaitCommand():
     def isEnabled(self):
         return True
 
+class ClearMemoryCommand():
+    def getName(self):
+        return "clearmem"
+
+    def execute(self, args):
+        global storedVariables
+        storedVariables.clear()
+        print("Memory cleared!")
+
+    def getMinimumArguments(self):
+        return 0
+    
+    def getUsage(self):
+        return "clearmem"
+    
+    def getShortDescription(self):
+        return "Clears all stored variables."
+    
+    def getLongDescription(self):
+        return ["Clears all stored variables."]
+
+    def isEnabled(self):
+        return True
+
 class ExitCommand():
     def getName(self):
         return "exit"
@@ -570,12 +564,12 @@ def runTerminal(header = "", commands = []):
     storedVariables = {}
     processor = CommandProcessor2()
     print(header)
-    processor.registerCommands([HelpCommand(processor), RunScriptCommand(processor), DefineCommand(), DefineIntCommand(), CompareCommand(), AddCommand(), PrintCommand(), ExecuteCommand(processor), ConditionalCommand(processor), WaitCommand(), ExitCommand()] + commands)
+    processor.registerCommands([HelpCommand(processor), RunScriptCommand(processor), DefineCommand(), DefineIntCommand(), CompareCommand(), AddCommand(), PrintCommand(), ConditionalCommand(processor), WaitCommand(), ClearMemoryCommand(), ExitCommand()] + commands)
     while True:
         parsedCommand = Utilities.getParsedInput("> ")
         processor.executeCommand(parsedCommand[0], parsedCommand[1])
-        while not processor.isQueueClear():
-            processor.executeQueue()
+        while processor.executeNextInQueue():
+            pass
 
 if __name__ == "__main__":
     runTerminal("[JUtils2 v" + Compatibility.getVersionString() + "]\nCreated by Ryan Jones @ 2018\n\nUse the 'help' command for a detailed list of commands.\n")
