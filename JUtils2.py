@@ -11,7 +11,7 @@ class Compatibility():
     """Provides simple methods to aid with compatibility."""
     def getVersion():
         """Returns a tuple providing the major, minor, patch, and pre-release identifier like so: (Major, Minor, Patch, Identifier)"""
-        return (0, 2, 0, "")
+        return (0, 2, 1, "")
 
     def getVersionString():
         """Returns the version in the following format: Major.Minor.Patch(-Pre-release Indetifier)\nThe identifier may be absent if the release is a full release."""
@@ -487,14 +487,16 @@ class RunScriptCommand():
         return "run"
 
     def execute(self, args):
-        if True:
+        try:
             commands = []
             with open(args[0], "r") as fileRead:
                 commands = AdvancedMap(fileRead).mapResults(lambda x: x.strip()).filterResults(lambda x: len(x) > 0).getResults()
             global storedVariables
             self.processor.queueCommands(AdvancedMap(commands).mapResults(lambda x: RunScriptCommand.__replaceAll(x, storedVariables)).getResults())
-        else:
-            print("An error occurred while executing the script.")
+        except IOError:
+            print("The script does not exist!")
+        except:
+            print("An error occurred while trying to run the script.")
 
     def __replaceAll(string, data):
         for x in data.keys():
