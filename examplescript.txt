@@ -4,4 +4,4 @@ add x 1
 print "Value of x: %x%"
 wait %x%
 compare x < 100
-conditional results true "run script.txt"
+conditional results true "run examplescript.txt"
