@@ -1,5 +1,5 @@
 # ==={ JUtils 2 by Ryan Jones }=== #
-# Release Date: 11/11/2018
+# Release Date: 11/17/2018
 
 import hashlib as sha
 import datetime
